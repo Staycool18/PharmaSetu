@@ -1,7 +1,6 @@
 package com.Medic.Medic.Controller;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -13,37 +12,61 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.Medic.Medic.Entity.Medicine;
-import com.Medic.Medic.Service.Implementation.MedicineServiceImpl;
+import com.Medic.Medic.Service.MedicineService;
 
 @RestController
-@RequestMapping("/med")
+@RequestMapping("/medicine")
 public class MedicineController {
-	
-	@Autowired
-	MedicineServiceImpl med_service;
 
-	@GetMapping("/{name}")
-    public ResponseEntity<Medicine> getMedicine(@PathVariable String name) {
-		Medicine med=med_service.getMedicineInfo(name);
-        return ResponseEntity.ok(med);
+    @Autowired
+    private MedicineService medicineService;
+
+    // 1. Fetch from FDA API
+    @GetMapping("/fetch/{name}")
+    public ResponseEntity<?> fetchFromFDA(@PathVariable String name) {
+        Medicine m = medicineService.fetchMedicineFromFDA(name);
+        if (m == null) {
+            return ResponseEntity.status(404).body("No information found in FDA API");
+        }
+        return ResponseEntity.ok(m);
     }
-	
-	@PostMapping("/add")
-	public ResponseEntity<String> addMedicine(@RequestBody Medicine med) {
-		med_service.AddMedicine(med);
-		return ResponseEntity.status(HttpStatus.CREATED).body("Medicine added successfully");
-	}
-	
-	@DeleteMapping("/remove/{id}")
-	public ResponseEntity<String> RemoveMedicine(@PathVariable Long id) {
-		med_service.RemoveMedicine(id);
-		return ResponseEntity.ok("Medicine removed successfully");
-	}
-	
-	@PutMapping("/update")
-	public ResponseEntity<String> updateMedicine(@RequestBody Medicine med) {
-		med_service.UpdateMedicine(med);
-		return ResponseEntity.ok("Medicine updated successfully");
-		
-	}
+
+    // 2. Add medicine manually OR after fetching
+    @PostMapping("/add")
+    public ResponseEntity<?> add(@RequestBody Medicine medicine) {
+        Medicine saved = medicineService.saveMedicine(medicine);
+        return ResponseEntity.ok(saved);
+    }
+
+    // 3. All medicines
+    @GetMapping("/all")
+    public ResponseEntity<?> getAll() {
+        return ResponseEntity.ok(medicineService.getAllMedicines());
+    }
+
+    // 4. Get by ID
+    @GetMapping("/{id}")
+    public ResponseEntity<?> getById(@PathVariable Long id) {
+        Medicine m = medicineService.getMedicine(id);
+        if (m == null) return ResponseEntity.status(404).body("Medicine not found");
+        return ResponseEntity.ok(m);
+    }
+
+    // 5. Update
+    @PutMapping("/update/{id}")
+    public ResponseEntity<?> update(
+            @PathVariable Long id,
+            @RequestBody Medicine medicine) {
+
+        Medicine updated = medicineService.updateMedicine(id, medicine);
+        if (updated == null) return ResponseEntity.status(404).body("Medicine not found");
+        return ResponseEntity.ok(updated);
+    }
+
+    // 6. Delete
+    @DeleteMapping("/delete/{id}")
+    public ResponseEntity<?> delete(@PathVariable Long id) {
+        medicineService.deleteMedicine(id);
+        return ResponseEntity.ok("Deleted");
+    }
 }

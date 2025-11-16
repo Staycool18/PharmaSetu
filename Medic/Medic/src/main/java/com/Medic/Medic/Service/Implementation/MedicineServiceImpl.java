@@ -1,8 +1,10 @@
 package com.Medic.Medic.Service.Implementation;
 
-import org.json.JSONArray;
-import org.json.JSONObject;
+import java.util.List;
+import java.util.Map;
+
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
@@ -11,63 +13,96 @@ import com.Medic.Medic.Repository.MedicineRepo;
 import com.Medic.Medic.Service.MedicineService;
 
 @Service
-public class MedicineServiceImpl implements MedicineService{
+public class MedicineServiceImpl implements MedicineService {
 
-	@Autowired
+    @Autowired
+    private MedicineRepo medicineRepository;
+
+    @Autowired
     private RestTemplate restTemplate;
-	
-	@Autowired
-	MedicineRepo med_repo;
 
-	@Override
-	public Medicine getMedicineInfo(String name) {
-		Medicine m = med_repo.findByName(name)
-		        .orElseThrow(() -> new RuntimeException("Medicine not found with name: " + name));
-		try {
-			
-			
-			String url="https://api.fda.gov/drug/label.json?search=openfda.brand_name:" + name +"\r\n";
-			String response = restTemplate.getForObject(url, String.class);
+    private final String FDA_API_URL = 
+        "https://api.fda.gov/drug/label.json?search=openfda.brand_name:";
 
-            JSONObject json = new JSONObject(response);
-            JSONArray results = json.getJSONArray("results");
-            JSONObject drug = results.getJSONObject(0);
-            
-            
-			
-			m.setDescription(drug.optString("description", "No description available"));
-			m.setSideEffects(drug.optString("warnings", "No data available"));
-			
-			return m;
-			
-		}
-		catch(Exception e){
-			System.out.println("Error fetching data: " + e.getMessage());
-            Medicine fallback=new Medicine();
-            fallback.setName(name);
-            fallback.setDescription("No data found for " + name);
-            return fallback;
-		}
-	}
+    @Override
+    public Medicine saveMedicine(Medicine medicine) {
+        return medicineRepository.save(medicine);
+    }
 
-	@Override
-	public void AddMedicine(Medicine med) {
-		med_repo.save(med);
-		
-	}
+    @Override
+    public Medicine fetchMedicineFromFDA(String name) {
+        try {
+            String url = FDA_API_URL + name;
 
-	public void RemoveMedicine(Long id) {
-		med_repo.deleteById(id);
-	}
+            ResponseEntity<Map> response = restTemplate.getForEntity(url, Map.class);
 
-	public void UpdateMedicine(Medicine med) {
-		Medicine existing=med_repo.findById(med.getId()).orElseThrow(()->new RuntimeException("Medicine not found"));
-		
-		
-		 if(med.getName() != null) {
-		       existing.setName(med.getName());
-		 }
-		
-		
-	}
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+
+                Map<String, Object> data = response.getBody();
+                List<Map<String, Object>> results = (List<Map<String, Object>>) data.get("results");
+
+                if (results == null || results.isEmpty()) {
+                    return null; // no data found
+                }
+
+                Map<String, Object> item = results.get(0); // first result
+
+                // Extract fields safely
+                Medicine med = new Medicine();
+                med.setName(name);
+
+                med.setDescription(
+                    item.containsKey("description") ?
+                    ((List<String>) item.get("description")).get(0) :
+                    "No description available"
+                );
+
+                med.setUsage(
+                    item.containsKey("indications_and_usage") ?
+                    ((List<String>) item.get("indications_and_usage")).get(0) :
+                    "No usage info"
+                );
+
+                med.setWarnings(
+                    item.containsKey("warnings") ?
+                    ((List<String>) item.get("warnings")).get(0) :
+                    "No warnings"
+                );
+
+                return med;
+            }
+        } catch (Exception ex) {
+            System.out.println("FDA API Error: " + ex.getMessage());
+        }
+
+        return null;
+    }
+
+    @Override
+    public List<Medicine> getAllMedicines() {
+        return medicineRepository.findAll();
+    }
+
+    @Override
+    public Medicine getMedicine(Long id) {
+        return medicineRepository.findById(id).orElse(null);
+    }
+
+    @Override
+    public Medicine updateMedicine(Long id, Medicine updated) {
+        Medicine existing = getMedicine(id);
+        if (existing == null) return null;
+
+        existing.setName(updated.getName());
+        existing.setDescription(updated.getDescription());
+        existing.setUsage(updated.getUsage());
+        existing.setWarnings(updated.getWarnings());
+
+        return medicineRepository.save(existing);
+    }
+
+    @Override
+    public void deleteMedicine(Long id) {
+        medicineRepository.deleteById(id);
+    }
 }
