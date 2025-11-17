@@ -33,8 +33,10 @@ public class UserController {
 
     @GetMapping("/get/{username}")
     public ResponseEntity<?> getUser(@PathVariable String username) {
-        User usr = userService.findByUsername(username);
-        return ResponseEntity.ok(usr);
+        return userService.findByUsername(username)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
+
 }
 

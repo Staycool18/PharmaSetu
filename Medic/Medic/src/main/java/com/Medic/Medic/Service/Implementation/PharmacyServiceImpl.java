@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 import com.Medic.Medic.Entity.Pharmacy;
 import com.Medic.Medic.Entity.User;
 import com.Medic.Medic.Repository.PharmacyRepository;
+import com.Medic.Medic.Repository.UserRepository;
 import com.Medic.Medic.Service.PharmacyService;
 
 @Service
@@ -14,6 +15,9 @@ public class PharmacyServiceImpl implements PharmacyService {
     @Autowired
     private PharmacyRepository pharmacyRepository;
 
+    @Autowired
+    private UserRepository userRepository;
+
     @Override
     public Pharmacy createPharmacy(Pharmacy pharmacy) {
         return pharmacyRepository.save(pharmacy);
@@ -21,13 +25,24 @@ public class PharmacyServiceImpl implements PharmacyService {
 
     @Override
     public Pharmacy getPharmacyByUser(User user) {
-        return pharmacyRepository.findByUser(user)
-                .orElse(null);
+        return pharmacyRepository.findByUser(user).orElse(null);
     }
 
     @Override
     public Pharmacy getPharmacyById(Long id) {
-        return pharmacyRepository.findById(id)
+        return pharmacyRepository.findById(id).orElse(null);
+    }
+
+    @Override
+    public Pharmacy getPharmacyByUsername(String username) {
+
+        User user = userRepository.findByUsername(username)
                 .orElse(null);
+
+        if (user == null) {
+            return null;
+        }
+
+        return pharmacyRepository.findByUser(user).orElse(null);
     }
 }

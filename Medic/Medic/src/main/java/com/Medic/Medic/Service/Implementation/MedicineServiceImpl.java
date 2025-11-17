@@ -9,21 +9,25 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import com.Medic.Medic.Entity.Medicine;
+import com.Medic.Medic.Entity.Pharmacy;
 import com.Medic.Medic.Repository.MedicineRepo;
 import com.Medic.Medic.Service.MedicineService;
+import com.Medic.Medic.Service.PharmacyService;
 
 @Service
 public class MedicineServiceImpl implements MedicineService {
-
     @Autowired
     private MedicineRepo medicineRepository;
 
     @Autowired
     private RestTemplate restTemplate;
 
+    @Autowired
+    private PharmacyService pharmacyService;
+
     private final String FDA_API_URL = 
         "https://api.fda.gov/drug/label.json?search=openfda.brand_name:";
-
+        
     @Override
     public Medicine saveMedicine(Medicine medicine) {
         return medicineRepository.save(medicine);
@@ -105,4 +109,21 @@ public class MedicineServiceImpl implements MedicineService {
     public void deleteMedicine(Long id) {
         medicineRepository.deleteById(id);
     }
+
+    @Override
+public Medicine addMedicineForPharmacy(Medicine medicine, String username) {
+
+    // get logged-in pharmacy
+    Pharmacy pharmacy = pharmacyService.getPharmacyByUsername(username);
+
+    if (pharmacy == null) {
+        throw new RuntimeException("Pharmacy not found for user: " + username);
+    }
+
+    // auto-assign pharmacy
+    medicine.setPharmacy(pharmacy);
+
+    return medicineRepository.save(medicine);
+}
+
 }

@@ -12,7 +12,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.Medic.Medic.Entity.Medicine;
+import com.Medic.Medic.Security.JwtUtil;
 import com.Medic.Medic.Service.MedicineService;
+
+import jakarta.servlet.http.HttpServletRequest;
 
 @RestController
 @RequestMapping("/medicine")
@@ -20,6 +23,9 @@ public class MedicineController {
 
     @Autowired
     private MedicineService medicineService;
+
+    @Autowired
+    private JwtUtil jwtUtil;
 
     // 1. Fetch from FDA API
     @GetMapping("/fetch/{name}")
@@ -33,8 +39,11 @@ public class MedicineController {
 
     // 2. Add medicine manually OR after fetching
     @PostMapping("/add")
-    public ResponseEntity<?> add(@RequestBody Medicine medicine) {
-        Medicine saved = medicineService.saveMedicine(medicine);
+    public ResponseEntity<?> add(@RequestBody Medicine medicine, HttpServletRequest request) {
+         String authHeader = request.getHeader("Authorization");
+        String token = authHeader.substring(7); // remove "Bearer "
+        String username = jwtUtil.extractUsername(token);
+        Medicine saved = medicineService.addMedicineForPharmacy(medicine, username);
         return ResponseEntity.ok(saved);
     }
 
