@@ -24,6 +24,10 @@ public class SecurityConfig {
     @Autowired
     private BCryptPasswordEncoder passwordEncoder;
 
+    @Autowired
+    private JwtFilter jwtFilter;
+
+    // Authentication Provider
     @Bean
     public DaoAuthenticationProvider authenticationProvider() {
         DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
@@ -32,33 +36,42 @@ public class SecurityConfig {
         return provider;
     }
 
+    // AuthenticationManager
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration config)
             throws Exception {
         return config.getAuthenticationManager();
     }
 
+    // Main Security Filter Chain
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http, JwtFilter jwtFilter) throws Exception {
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
 
         http.csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/auth/register-user",
-                                         "/auth/register-pharmacy",
-                                         "/auth/login").permitAll()
+                        .requestMatchers(
+                                "/auth/register-user",
+                                "/auth/register-pharmacy",
+                                "/auth/login"
+                        ).permitAll()
                         .requestMatchers("/medicine/all", "/medicine/fetch/**").permitAll()
                         .requestMatchers("/medicine/add",
                                          "/medicine/update/**",
-                                         "/medicine/delete/**").hasRole("PHARMACY")
+                                         "/medicine/delete/**")
+                        .hasRole("PHARMACY")
                         .anyRequest().authenticated()
                 )
-                .sessionManagement(session ->
-                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                .sessionManagement(sess ->
+                        sess.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 );
 
-        http.authenticationProvider(authenticationProvider());
+        // Add JWT Filter BEFORE UsernamePasswordAuthenticationFilter
         http.addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+
+        // Register authentication provider
+        http.authenticationProvider(authenticationProvider());
 
         return http.build();
     }
+
 }

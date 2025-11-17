@@ -16,8 +16,7 @@ import io.jsonwebtoken.security.Keys;
 public class JwtUtil {
 
     private final String SECRET = "super_long_new_secret_key_for_medic_project_2025_ABCDEFG123456789";
-
-    private final long EXPIRATION = 24 * 60 * 60 * 1000;
+    private final long EXPIRATION = 24 * 60 * 60 * 1000; // 24 hours
 
     private SecretKey getSigningKey() {
         return Keys.hmacShaKeyFor(SECRET.getBytes());
@@ -35,8 +34,7 @@ public class JwtUtil {
     }
 
     public String extractUsername(String token) {
-        return extractAllClaims(token)
-                .getSubject();
+        return extractAllClaims(token).getSubject();
     }
 
     public boolean isTokenValid(String token, UserDetails userDetails) {

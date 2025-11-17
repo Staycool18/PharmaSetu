@@ -12,6 +12,7 @@ com\Medic\Medic\Security\JwtUtil.class
 com\Medic\Medic\Controller\MedicineController.class
 com\Medic\Medic\Entity\Pharmacy.class
 com\Medic\Medic\Repository\PharmacyRepository.class
+com\Medic\Medic\Entity\User$UserBuilder.class
 com\Medic\Medic\Repository\MedicineRepo.class
 com\Medic\Medic\Config\SecurityConfig.class
 com\Medic\Medic\Entity\Medicine.class

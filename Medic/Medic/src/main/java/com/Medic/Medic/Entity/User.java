@@ -6,8 +6,16 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Entity
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 @Table(name = "users")
 public class User {
 
@@ -15,34 +23,13 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true)
-    private String emailId;   // login email
+    @Column(unique = true, nullable = false)
+    private String emailId;
 
-    @Column(nullable = false, unique = true)
-    private String username;  // will store emailId
+    @Column(unique = true, nullable = false)
+    private String username;   // used for login (same as emailId)
 
-    @Column(nullable = false)
     private String password;
 
-    @Column(nullable = false)
-    private String role;      // e.g. ROLE_PHARMACY, ROLE_USER
-
-    public User() {}
-
-    // getters + setters…
-
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-
-    public String getEmailId() { return emailId; }
-    public void setEmailId(String emailId) { this.emailId = emailId; }
-
-    public String getUsername() { return username; }
-    public void setUsername(String username) { this.username = username; }
-
-    public String getPassword() { return password; }
-    public void setPassword(String password) { this.password = password; }
-
-    public String getRole() { return role; }
-    public void setRole(String role) { this.role = role; }
+    private String role;       // e.g. ROLE_USER, ROLE_PHARMACY
 }

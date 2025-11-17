@@ -16,6 +16,7 @@ import com.Medic.Medic.Service.PharmacyService;
 
 @Service
 public class MedicineServiceImpl implements MedicineService {
+
     @Autowired
     private MedicineRepo medicineRepository;
 
@@ -25,9 +26,9 @@ public class MedicineServiceImpl implements MedicineService {
     @Autowired
     private PharmacyService pharmacyService;
 
-    private final String FDA_API_URL = 
-        "https://api.fda.gov/drug/label.json?search=openfda.brand_name:";
-        
+    private final String FDA_API_URL =
+            "https://api.fda.gov/drug/label.json?search=openfda.brand_name:";
+
     @Override
     public Medicine saveMedicine(Medicine medicine) {
         return medicineRepository.save(medicine);
@@ -51,7 +52,6 @@ public class MedicineServiceImpl implements MedicineService {
 
                 Map<String, Object> item = results.get(0); // first result
 
-                // Extract fields safely
                 Medicine med = new Medicine();
                 med.setName(name);
 
@@ -101,6 +101,7 @@ public class MedicineServiceImpl implements MedicineService {
         existing.setDescription(updated.getDescription());
         existing.setUsage(updated.getUsage());
         existing.setWarnings(updated.getWarnings());
+        existing.setSideEffects(updated.getSideEffects());
 
         return medicineRepository.save(existing);
     }
@@ -111,19 +112,16 @@ public class MedicineServiceImpl implements MedicineService {
     }
 
     @Override
-public Medicine addMedicineForPharmacy(Medicine medicine, String username) {
+    public Medicine addMedicineForPharmacy(Medicine medicine, String username) {
 
-    // get logged-in pharmacy
-    Pharmacy pharmacy = pharmacyService.getPharmacyByUsername(username);
+        Pharmacy pharmacy = pharmacyService.getPharmacyByUsername(username);
 
-    if (pharmacy == null) {
-        throw new RuntimeException("Pharmacy not found for user: " + username);
+        if (pharmacy == null) {
+            throw new RuntimeException("Pharmacy not found for user: " + username);
+        }
+
+        medicine.setPharmacy(pharmacy);
+
+        return medicineRepository.save(medicine);
     }
-
-    // auto-assign pharmacy
-    medicine.setPharmacy(pharmacy);
-
-    return medicineRepository.save(medicine);
-}
-
 }
