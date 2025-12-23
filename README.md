@@ -51,18 +51,24 @@ It enables medicine browsing, cart management, secure authentication, order plac
 
 PharmaSetu/
 │
-├── frontend/                # React (Vite) frontend
-│   ├── src/                 # Frontend source code
-│   ├── public/              # Static assets
-│   └── package.json         # Frontend dependencies
-│
-├── backend/                 # Spring Boot backend
-│   ├── src/main/java/       # Backend source code
-│   ├── src/test/java/       # Backend test cases
-│   └── pom.xml              # Maven configuration
-│
-└── README.md                # Project documentation
+├── frontend/ # React (Vite) frontend
 
+│ ├── src/
+
+│ ├── public/
+
+│ └── package.json
+│
+
+├── backend/ # Spring Boot backend
+│ ├── src/main/java
+
+│ ├── src/test/java
+
+│ └── pom.xml
+
+│
+└── README.md
 
 ---
 
