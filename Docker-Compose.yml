@@ -1,0 +1,41 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: medic
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - pharmasetu-net
+
+  backend:
+    build: ./backend
+    container_name: backend
+    restart: always
+    depends_on:
+      - mysql
+    ports:
+      - "8083:8083"
+    networks:
+      - pharmasetu-net
+
+  frontend:
+    build: ./frontend
+    container_name: frontend
+    restart: always
+    depends_on:
+      - backend
+    ports:
+      - "5173:80"
+    networks:
+      - pharmasetu-net
+
+networks:
+  pharmasetu-net:
+    driver: bridge
+
+volumes:
+  mysql_data:
