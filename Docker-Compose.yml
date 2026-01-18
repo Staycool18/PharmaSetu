@@ -12,9 +12,8 @@ services:
       - pharmasetu-net
 
   backend:
-    build: ./backend
+    image: staycool18/pharmasetu-backend:latest
     container_name: backend
-    restart: always
     depends_on:
       - mysql
     ports:
@@ -23,9 +22,8 @@ services:
       - pharmasetu-net
 
   frontend:
-    build: ./frontend
+    image: staycool18/pharmasetu-frontend:latest
     container_name: frontend
-    restart: always
     depends_on:
       - backend
     ports:
