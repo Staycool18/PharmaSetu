@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pharmasetu-backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: PharmaSetu-1
+  template:
+    metadata:
+      labels:
+        app: PharmaSetu-1
+    spec:
+      containers:
+        - name: pharmasetu-backend
+          image: staycool18/pharmasetu-merged:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8083
+          envFrom:
+            - configMapRef:
+                name: pharmasetu-config
