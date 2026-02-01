@@ -1,10 +1,8 @@
+version: "3.9"
+
 services:
   mysql:
     image: mysql:8.0
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 10s
-      retries: 5
     container_name: mysql
     restart: always
     environment:
@@ -12,6 +10,10 @@ services:
       MYSQL_DATABASE: medic
     volumes:
       - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      retries: 5
     networks:
       - pharmasetu-net
 
@@ -19,9 +21,14 @@ services:
     image: staycool18/pharmasetu-backend:latest
     container_name: backend
     depends_on:
-      - mysql
+      mysql:
+        condition: service_healthy
     ports:
       - "8083:8083"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/medic
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root
     networks:
       - pharmasetu-net
 
