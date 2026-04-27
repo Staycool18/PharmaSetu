@@ -5,6 +5,9 @@ phases:
     runtime-versions:
       java: corretto17
       nodejs: 18
+    commands:
+      - java -version
+      - mvn -version
 
   pre_build:
     commands:
@@ -16,7 +19,7 @@ phases:
       - echo "Building frontend..."
       - cd frontend && npm run build && cd ..
       - echo "Building backend..."
-      - cd backend && chmod +x mvnw && ./mvnw clean package -DskipTests && cd ..
+      - cd backend && mvn clean package -DskipTests && cd ..
 
   post_build:
     commands:
