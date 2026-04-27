@@ -16,7 +16,7 @@ phases:
       - echo "Building frontend..."
       - cd frontend && npm run build && cd ..
       - echo "Building backend..."
-      - cd backend && ./mvnw clean package -DskipTests && cd ..
+      - cd backend && chmod +x mvnw && ./mvnw clean package -DskipTests && cd ..
 
   post_build:
     commands:
