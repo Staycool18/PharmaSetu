@@ -5,7 +5,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -14,7 +13,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.Medic.Medic.Dto.AuthenticationRequest;
 import com.Medic.Medic.Dto.AuthenticationResponse;
-import com.Medic.Medic.Dto.ForgetPassRequest;
 import com.Medic.Medic.Security.CustomUserDetailsService;
 import com.Medic.Medic.Security.JwtUtil;
 
@@ -32,24 +30,28 @@ public class AuthenticationController {
     @Autowired
     private JwtUtil jwtUtil;
 
-    @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody AuthenticationRequest request) {
+   @PostMapping("/login")
+public ResponseEntity<?> login(@RequestBody AuthenticationRequest request) {
 
-        UsernamePasswordAuthenticationToken authToken =
-                new UsernamePasswordAuthenticationToken(
-                        request.getUsername(),
-                        request.getPassword()
-                );
-
-        authenticationManager.authenticate(authToken);
-
-        UserDetails userDetails =
-                userDetailsService.loadUserByUsername(request.getUsername());
-
-        String token = jwtUtil.generateToken(userDetails);
-
-        return ResponseEntity.ok(new AuthenticationResponse(token));
+    try {
+        authenticationManager.authenticate(
+            new UsernamePasswordAuthenticationToken(
+                request.getUsername(),
+                request.getPassword()
+            )
+        );
+    } catch (Exception e) {
+        System.out.println("AUTH FAILED: " + e.getClass().getName());
+        return ResponseEntity.status(401).body("Invalid username or password");
     }
+
+    UserDetails userDetails =
+            userDetailsService.loadUserByUsername(request.getUsername());
+
+    String token = jwtUtil.generateToken(userDetails);
+    return ResponseEntity.ok(new AuthenticationResponse(token));
+}
+
     
     
 }

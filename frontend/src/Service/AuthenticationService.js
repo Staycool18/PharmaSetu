@@ -1,5 +1,7 @@
 import axios from 'axios'
 
-export const login=async (request) =>{
-   return await axios.post('http://localhost:8083/auth/login',request)
-}
+const API_BASE = `http://${window.location.hostname}:8083`;
+
+export const login = (request) => {
+  return axios.post(`${API_BASE}/auth/login`, request);
+};

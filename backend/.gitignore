@@ -14,8 +14,5 @@ target/
 .DS_Store
 Thumbs.db
 
-# Application properties (contains sensitive data)
-src/main/resources/application.properties
-
 # Maven wrapper
 .mvn/wrapper/maven-wrapper.jar
