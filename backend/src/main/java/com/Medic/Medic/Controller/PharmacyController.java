@@ -11,8 +11,10 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.Medic.Medic.Dto.PharmacyLocationResponse;
 import com.Medic.Medic.Entity.Pharmacy;
 import com.Medic.Medic.Entity.User;
 import com.Medic.Medic.Service.PharmacyService;
@@ -32,6 +34,15 @@ public class PharmacyController {
     public ResponseEntity<?> create(@RequestBody Pharmacy pharmacy) {
         Pharmacy saved = pharmacyService.createPharmacy(pharmacy);
         return ResponseEntity.ok(saved);
+    }
+
+    @GetMapping("/nearby")
+    public List<PharmacyLocationResponse> getNearbyPharmacies(
+            @RequestParam double lat,
+            @RequestParam double lon,
+            @RequestParam(defaultValue = "5") double radius
+    ) {
+        return pharmacyService.getNearbyPharmacies(lat, lon, radius);
     }
 
     @GetMapping("/by-user/{userId}")

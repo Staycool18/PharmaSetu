@@ -6,30 +6,66 @@ import "./PharmacyList.css";
 
 const PharmacyList = () => {
   const [pharmacies, setPharmacies] = useState([]);
+  const [loading, setLoading] = useState(true);
+
   const token = localStorage.getItem("token");
   const navigate = useNavigate();
 
   useEffect(() => {
-    const fetchPharmacies = async () => {
-      try {
-        const response = await axios.get("http://localhost:8083/pharmacy/", {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setPharmacies(response.data);
-      } catch (err) {
-        console.error(err);
-        alert("Error fetching pharmacies.");
+    // 1️⃣ Get user's current location
+    if (!navigator.geolocation) {
+      alert("Geolocation is not supported by your browser");
+      setLoading(false);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const lat = position.coords.latitude;
+          const lon = position.coords.longitude;
+
+          // 2️⃣ Call Spring Boot backend with location
+          const response = await axios.get(
+            "http://localhost:8080/api/pharmacies/nearby",
+            {
+              params: {
+                lat,
+                lon,
+                radius: 5
+              },
+              headers: {
+                Authorization: `Bearer ${token}`
+              }
+            }
+          );
+
+          setPharmacies(response.data);
+        } catch (error) {
+          console.error(error);
+          alert("Error fetching nearby pharmacies");
+        } finally {
+          setLoading(false);
+        }
+      },
+      (error) => {
+        console.error(error);
+        alert("Location permission denied");
+        setLoading(false);
       }
-    };
-    fetchPharmacies();
+    );
   }, [token]);
 
   const goToRegister = () => {
     navigate("/pharmacy/register");
   };
 
+  if (loading) {
+    return <h2 style={{ textAlign: "center" }}>📍 Finding nearby pharmacies...</h2>;
+  }
+
   return (
-      <div className="pharmacies-page">
+    <div className="pharmacies-page">
       <button
         className="logout-btn"
         onClick={() => {
@@ -37,15 +73,19 @@ const PharmacyList = () => {
           navigate("/");
         }}
       >
-    Logout
-  </button>
+        Logout
+      </button>
 
       <div className="pharmacies-header">
-        <h1>🏪 Trusted Pharmacies</h1>
+        <h1>🏪 Nearby Pharmacies</h1>
         <div className="header-buttons">
-          <button onClick={() => navigate("/order-history")} className="history-btn">
+          <button
+            onClick={() => navigate("/order-history")}
+            className="history-btn"
+          >
             📋 Order History
           </button>
+
           <button onClick={goToRegister}>
             ➕ Register Your Pharmacy
           </button>
@@ -53,15 +93,18 @@ const PharmacyList = () => {
       </div>
 
       <div className="pharmacies-grid">
-        {pharmacies.map((pharmacy) => (
-          <Card
-            key={pharmacy.id}
-            id={pharmacy.id}
-            name={pharmacy.pharmacyName}
-            address={pharmacy.address || "N/A"}
-            email={pharmacy.email}
-          />
-        ))}
+        {pharmacies.length === 0 ? (
+          <p>No pharmacies found near your location.</p>
+        ) : (
+          pharmacies.map((pharmacy, index) => (
+            <Card
+              key={index}
+              name={pharmacy.pharmacyName}
+              address={pharmacy.address || "N/A"}
+              distance={`${pharmacy.distance.toFixed(2)} km`}
+            />
+          ))
+        )}
       </div>
     </div>
   );

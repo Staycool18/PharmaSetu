@@ -32,6 +32,11 @@ public class Pharmacy {
 
     private String password;
 
+     // ✅ LOCATION FIELDS (MANDATORY)
+    private double latitude;
+    private double longitude;
+    private String address;
+
     @OneToOne
     @JoinColumn(name = "user_id", nullable = false)
     private User user;

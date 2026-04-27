@@ -1,11 +1,13 @@
 package com.Medic.Medic.Service.Implementation;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import com.Medic.Medic.Dto.PharmacyLocationResponse;
 import com.Medic.Medic.Entity.Pharmacy;
 import com.Medic.Medic.Entity.User;
 import com.Medic.Medic.Repository.PharmacyRepository;
@@ -76,6 +78,28 @@ public class PharmacyServiceImpl implements PharmacyService {
 		return pharmacyRepository.findAll();
 		
 	}
+
+    @Override
+     public List<PharmacyLocationResponse> getNearbyPharmacies(
+            double lat, double lon, double radius) {
+
+        List<Object[]> results =
+                pharmacyRepository.findNearbyPharmacies(lat, lon, radius);
+
+        List<PharmacyLocationResponse> response = new ArrayList<>();
+
+        for (Object[] row : results) {
+            Pharmacy pharmacy = (Pharmacy) row[0];
+            double distance = ((Number) row[1]).doubleValue();
+
+            response.add(new PharmacyLocationResponse(
+                    pharmacy.getPharmacyName(),
+                    pharmacy.getAddress(),
+                    distance
+            ));
+        }
+        return response;
+    }
     
      
 }
