@@ -1,13 +1,15 @@
 #!/bin/bash
-exec > /opt/pharmasetu/logs/before_install.log 2>&1
 set -e
 
-echo "=== before_install.sh started ==="
-
-# Create directories first
+# Create directories FIRST
 mkdir -p /opt/pharmasetu/backend
 mkdir -p /opt/pharmasetu/logs
 mkdir -p /var/www/pharmasetu
+
+# Now redirect logs (after folder exists)
+exec > /opt/pharmasetu/logs/before_install.log 2>&1
+
+echo "=== before_install.sh started ==="
 
 # Stop backend if running
 if systemctl is-active --quiet pharmasetu-backend; then
@@ -26,7 +28,7 @@ else
 fi
 
 # Clean old files
-rm -f /opt/pharmasetu/backend/*.jar
-rm -rf /var/www/pharmasetu/*
+rm -f /opt/pharmasetu/backend/*.jar || true
+rm -rf /var/www/pharmasetu/* || true
 
 echo "=== before_install.sh completed ==="
