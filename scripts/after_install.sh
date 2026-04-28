@@ -74,7 +74,7 @@ EOF
 
 echo "nginx config written"
 
-# Create systemd service
+# Create systemd service (UPDATED ExecStart)
 cat << EOF | sudo tee /etc/systemd/system/pharmasetu-backend.service
 [Unit]
 Description=PharmaSetu Spring Boot Backend
@@ -83,7 +83,7 @@ After=network.target
 [Service]
 User=ec2-user
 WorkingDirectory=/opt/pharmasetu/backend
-ExecStart=/usr/bin/java -jar ${JAR_FILE} --spring.config.location=/opt/pharmasetu/backend/application.properties
+ExecStart=/usr/bin/java -jar ${JAR_FILE} --spring.config.location=optional:/opt/pharmasetu/backend/application.properties
 SuccessExitStatus=143
 StandardOutput=append:/opt/pharmasetu/logs/backend.log
 StandardError=append:/opt/pharmasetu/logs/backend-error.log
@@ -100,7 +100,7 @@ echo "systemd service created"
 sudo chown -R ec2-user:ec2-user /opt/pharmasetu
 sudo chown -R ec2-user:ec2-user /var/www/pharmasetu
 
-# Reload systemd
+# Reload systemd (DO NOT start here)
 sudo systemctl daemon-reload
 
 echo "=== after_install.sh completed ==="
