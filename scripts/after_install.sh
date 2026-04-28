@@ -1,13 +1,15 @@
 #!/bin/bash
 set -e
 
-# Ensure log directory exists FIRST
-mkdir -p /opt/pharmasetu/logs
+echo "=== after_install.sh started ==="
+
+# Create required directories
+sudo mkdir -p /opt/pharmasetu/backend
+sudo mkdir -p /opt/pharmasetu/logs
+sudo mkdir -p /var/www/pharmasetu
 
 # Redirect logs AFTER directory exists
 exec > /opt/pharmasetu/logs/after_install.log 2>&1
-
-echo "=== after_install.sh started ==="
 
 # Install Java 17 if not present
 if ! command -v java &> /dev/null; then
@@ -26,19 +28,16 @@ else
     echo "nginx already installed"
 fi
 
-# Ensure backend directory exists
-mkdir -p /opt/pharmasetu/backend
-
-# OPTIONAL: Handle application.properties safely
+# OPTIONAL: Copy external application.properties if exists
 if [ -f /etc/pharmasetu/application.properties ]; then
     echo "Copying application.properties..."
-    cp /etc/pharmasetu/application.properties /opt/pharmasetu/backend/application.properties
+    sudo cp /etc/pharmasetu/application.properties /opt/pharmasetu/backend/application.properties
 else
-    echo "WARNING: application.properties not found, skipping..."
+    echo "No external application.properties found (will use internal config)"
 fi
 
-# Find the deployed JAR
-JAR_FILE=$(ls /opt/pharmasetu/backend/*.jar 2>/dev/null | head -1)
+# Find deployed JAR (robust)
+JAR_FILE=$(find /opt/pharmasetu/backend -name "*.jar" | head -1)
 
 if [ -z "$JAR_FILE" ]; then
     echo "ERROR: No JAR file found in /opt/pharmasetu/backend/"
@@ -49,8 +48,6 @@ fi
 echo "Found JAR: $JAR_FILE"
 
 # Configure nginx
-sudo mkdir -p /var/www/pharmasetu
-
 cat << 'EOF' | sudo tee /etc/nginx/conf.d/pharmasetu.conf
 server {
     listen 80;
@@ -72,9 +69,9 @@ server {
 }
 EOF
 
-echo "nginx config written"
+echo "nginx configured"
 
-# Create systemd service (UPDATED ExecStart)
+# Create systemd service
 cat << EOF | sudo tee /etc/systemd/system/pharmasetu-backend.service
 [Unit]
 Description=PharmaSetu Spring Boot Backend
@@ -100,7 +97,7 @@ echo "systemd service created"
 sudo chown -R ec2-user:ec2-user /opt/pharmasetu
 sudo chown -R ec2-user:ec2-user /var/www/pharmasetu
 
-# Reload systemd (DO NOT start here)
+# Reload systemd
 sudo systemctl daemon-reload
 
 echo "=== after_install.sh completed ==="

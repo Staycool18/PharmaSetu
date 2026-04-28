@@ -1,31 +1,46 @@
 #!/bin/bash
 set -e
 
+# Ensure log directory exists
+sudo mkdir -p /opt/pharmasetu/logs
+
+# Redirect logs
 exec > /opt/pharmasetu/logs/start.log 2>&1
 
-echo "Starting services..."
+echo "=== start.sh started ==="
 
-# Restart backend safely
+# Reload systemd (only needed if service file changed)
 sudo systemctl daemon-reload
+
+# Start backend
+echo "Starting backend..."
+sudo systemctl enable pharmasetu-backend
 sudo systemctl restart pharmasetu-backend
 
-sleep 10
+echo "Waiting for backend to boot..."
+sleep 12
 
-sudo systemctl is-active --quiet pharmasetu-backend || {
-  echo "Backend failed"
-  journalctl -u pharmasetu-backend -n 50
-  exit 1
-}
+# Check backend status
+if systemctl is-active --quiet pharmasetu-backend; then
+    echo "Backend started successfully"
+else
+    echo "ERROR: Backend failed to start"
+    journalctl -u pharmasetu-backend --no-pager -n 50
+    exit 1
+fi
 
-echo "Backend OK"
-
-# Restart nginx safely
+# Start nginx
+echo "Starting nginx..."
+sudo systemctl enable nginx
 sudo systemctl restart nginx
 
-sudo systemctl is-active --quiet nginx || {
-  echo "nginx failed"
-  journalctl -u nginx -n 30
-  exit 1
-}
+# Check nginx status
+if systemctl is-active --quiet nginx; then
+    echo "nginx started successfully"
+else
+    echo "ERROR: nginx failed to start"
+    journalctl -u nginx --no-pager -n 30
+    exit 1
+fi
 
-echo "All services started successfully"
+echo "=== All services started successfully ==="
