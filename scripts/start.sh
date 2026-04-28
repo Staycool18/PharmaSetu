@@ -1,38 +1,31 @@
 #!/bin/bash
-exec > /opt/pharmasetu/logs/start.log 2>&1
 set -e
 
-echo "=== start.sh started ==="
+exec > /opt/pharmasetu/logs/start.log 2>&1
 
-# Start backend
-echo "Starting pharmasetu-backend..."
-systemctl enable pharmasetu-backend
-systemctl start pharmasetu-backend
+echo "Starting services..."
 
-# Wait for backend to come up
-echo "Waiting for backend to start..."
-sleep 15
+# Restart backend safely
+sudo systemctl daemon-reload
+sudo systemctl restart pharmasetu-backend
 
-# Check backend is running
-if systemctl is-active --quiet pharmasetu-backend; then
-    echo "Backend started successfully"
-else
-    echo "ERROR: Backend failed to start"
-    journalctl -u pharmasetu-backend --no-pager -n 50
-    exit 1
-fi
+sleep 10
 
-# Start nginx
-echo "Starting nginx..."
-systemctl enable nginx
-systemctl start nginx
+sudo systemctl is-active --quiet pharmasetu-backend || {
+  echo "Backend failed"
+  journalctl -u pharmasetu-backend -n 50
+  exit 1
+}
 
-if systemctl is-active --quiet nginx; then
-    echo "nginx started successfully"
-else
-    echo "ERROR: nginx failed to start"
-    journalctl -u nginx --no-pager -n 20
-    exit 1
-fi
+echo "Backend OK"
 
-echo "=== start.sh completed ==="
+# Restart nginx safely
+sudo systemctl restart nginx
+
+sudo systemctl is-active --quiet nginx || {
+  echo "nginx failed"
+  journalctl -u nginx -n 30
+  exit 1
+}
+
+echo "All services started successfully"
