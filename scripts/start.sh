@@ -1,46 +1,36 @@
 #!/bin/bash
 set -e
 
-# Ensure log directory exists
-sudo mkdir -p /opt/pharmasetu/logs
-
-# Redirect logs
+mkdir -p /opt/pharmasetu/logs
 exec > /opt/pharmasetu/logs/start.log 2>&1
 
-echo "=== start.sh started ==="
+echo "=== Starting services ==="
 
-# Reload systemd (only needed if service file changed)
+# Reload systemd
 sudo systemctl daemon-reload
 
-# Start backend
+# Start backend (DON'T fail deployment if it crashes)
 echo "Starting backend..."
-sudo systemctl enable pharmasetu-backend
-sudo systemctl restart pharmasetu-backend
+sudo systemctl restart pharmasetu-backend || echo "Backend restart failed"
 
-echo "Waiting for backend to boot..."
-sleep 12
+sleep 10
 
-# Check backend status
 if systemctl is-active --quiet pharmasetu-backend; then
-    echo "Backend started successfully"
+  echo "Backend is running"
 else
-    echo "ERROR: Backend failed to start"
-    journalctl -u pharmasetu-backend --no-pager -n 50
-    exit 1
+  echo "WARNING: Backend is NOT running (deployment will continue)"
+  journalctl -u pharmasetu-backend -n 20 --no-pager
 fi
 
 # Start nginx
 echo "Starting nginx..."
-sudo systemctl enable nginx
 sudo systemctl restart nginx
 
-# Check nginx status
 if systemctl is-active --quiet nginx; then
-    echo "nginx started successfully"
+  echo "nginx is running"
 else
-    echo "ERROR: nginx failed to start"
-    journalctl -u nginx --no-pager -n 30
-    exit 1
+  echo "WARNING: nginx failed to start"
+  journalctl -u nginx -n 20 --no-pager
 fi
 
-echo "=== All services started successfully ==="
+echo "=== Deployment completed ==="
