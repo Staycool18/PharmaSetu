@@ -7,8 +7,12 @@ yum update -y
 # Install Java 17
 yum install -y java-17-amazon-corretto
 
-# Install nginx
-yum install -y nginx
+# Install nginx (Amazon Linux 2: use Extras; AL2023 can use yum install nginx)
+if command -v amazon-linux-extras &> /dev/null; then
+  amazon-linux-extras install nginx1 -y
+else
+  yum install -y nginx
+fi
 
 # Install CodeDeploy agent
 yum install -y ruby wget

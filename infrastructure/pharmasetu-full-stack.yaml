@@ -336,10 +336,12 @@ Resources:
               set -e
               export AWS_DEFAULT_REGION=${AWS::Region}
               yum update -y
-              yum install -y ruby wget nginx jq
+              yum install -y ruby wget jq
+              # Amazon Linux 2: nginx is only via Extras, not default yum.
+              amazon-linux-extras install nginx1 -y
 
               cd /home/ec2-user
-              wget https://aws-codedeploy-ap-south-1.s3.ap-south-1.amazonaws.com/latest/install
+              wget -q "https://aws-codedeploy-${AWS::Region}.amazonaws.com/latest/install"
               chmod +x ./install
               ./install auto
               systemctl enable codedeploy-agent

@@ -22,9 +22,17 @@ else
 fi
 
 # Install nginx if not present
+# Amazon Linux 2: nginx is not in default yum repos — use Extras ("nginx1").
+# Amazon Linux 2023: package is typically named nginx in dnf/yum.
 if ! command -v nginx &> /dev/null; then
     echo "Installing nginx..."
-    sudo yum install -y nginx
+    if command -v amazon-linux-extras &> /dev/null; then
+        sudo amazon-linux-extras install nginx1 -y
+    elif command -v dnf &> /dev/null; then
+        sudo dnf install -y nginx
+    else
+        sudo yum install -y nginx
+    fi
 else
     echo "nginx already installed"
 fi
