@@ -19,12 +19,12 @@ else
     echo "WARNING: nginx is NOT running"
 fi
 
-# Optional health check
+# Optional health check (public permitAll endpoint; actuator not enabled in this app)
 sleep 5
-if curl -sf http://localhost:8083/actuator/health > /dev/null 2>&1; then
+if curl -sf http://localhost:8083/medicine/all > /dev/null 2>&1; then
     echo "Backend health check passed"
 else
-    echo "WARNING: Health endpoint not reachable"
+    echo "WARNING: Backend API not reachable on /medicine/all"
 fi
 
 echo "=== validate_service.sh completed ==="

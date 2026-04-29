@@ -8,8 +8,8 @@ sudo mkdir -p /opt/pharmasetu/backend
 sudo mkdir -p /opt/pharmasetu/logs
 sudo mkdir -p /var/www/pharmasetu
 
-# Redirect logs AFTER directory exists
-exec > /opt/pharmasetu/logs/after_install.log 2>&1
+# Log to file and stdout so CodeDeploy lifecycle logs show errors (not only after_install.log on disk).
+exec > >(tee -a /opt/pharmasetu/logs/after_install.log) 2>&1
 
 # Install Java 17 if not present
 if ! command -v java &> /dev/null; then
@@ -17,7 +17,8 @@ if ! command -v java &> /dev/null; then
     sudo yum install -y java-17-amazon-corretto
 else
     echo "Java already installed"
-    java -version
+    # Corretto/OpenJDK convention: java -version prints to stderr and exits 1 even on success.
+    java -version 2>&1 || true
 fi
 
 # Install nginx if not present
@@ -28,12 +29,12 @@ else
     echo "nginx already installed"
 fi
 
-# OPTIONAL: Copy external application.properties if exists
+# Optional RDS / env override (merged with JAR defaults; see Spring additional-location below)
 if [ -f /etc/pharmasetu/application.properties ]; then
-    echo "Copying application.properties..."
-    sudo cp /etc/pharmasetu/application.properties /opt/pharmasetu/backend/application.properties
+    echo "Copying external datasource override..."
+    sudo cp /etc/pharmasetu/application.properties /opt/pharmasetu/backend/application-override.properties
 else
-    echo "No external application.properties found (will use internal config)"
+    echo "No /etc/pharmasetu/application.properties (using JAR defaults only)"
 fi
 
 # Find deployed JAR (robust)
@@ -80,7 +81,7 @@ After=network.target
 [Service]
 User=ec2-user
 WorkingDirectory=/opt/pharmasetu/backend
-ExecStart=/usr/bin/java -jar ${JAR_FILE} --spring.config.location=optional:/opt/pharmasetu/backend/application.properties
+ExecStart=/usr/bin/java -jar ${JAR_FILE} --spring.config.additional-location=optional:file:/opt/pharmasetu/backend/application-override.properties
 SuccessExitStatus=143
 StandardOutput=append:/opt/pharmasetu/logs/backend.log
 StandardError=append:/opt/pharmasetu/logs/backend-error.log

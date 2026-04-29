@@ -1,0 +1,614 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  PharmaSetu: VPC, public subnets, ALB, optional ACM HTTPS, MySQL RDS in private subnets,
+  Amazon Linux 2 ASG with CodeDeploy agent, S3 artifacts, CodeBuild, CodeDeploy, CodePipeline (GitHub).
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: GitHub source
+        Parameters:
+          - GitHubOwner
+          - GitHubRepo
+          - GitHubBranch
+      - Label:
+          default: Compute & TLS
+        Parameters:
+          - KeyPairName
+          - ACMCertificateArn
+      - Label:
+          default: Database
+        Parameters:
+          - DBPassword
+      - Label:
+          default: DNS (optional)
+        Parameters:
+          - DnsHostedZoneId
+          - DnsRecordName
+
+Parameters:
+  KeyPairName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: EC2 SSH key (Amazon Linux 2 instances use ec2-user).
+
+  DBPassword:
+    Type: String
+    NoEcho: true
+    MinLength: 8
+    Description: MySQL master password (stored in Secrets Manager). Avoid quotes in the password.
+
+  GitHubOwner:
+    Type: String
+    Description: GitHub organisation or username that owns the repository.
+
+  GitHubRepo:
+    Type: String
+    Default: PharmaSetu
+    Description: Repository name (the one that contains buildspec.yml at the root).
+
+  GitHubBranch:
+    Type: String
+    Default: main
+
+  ACMCertificateArn:
+    Type: String
+    Default: ''
+    Description: >
+      ACM certificate ARN in this region for HTTPS. Leave empty for HTTP-only (ALB port 80 forwards to nginx).
+
+  DnsHostedZoneId:
+    Type: String
+    Default: ''
+    Description: Route 53 hosted zone ID for an alias A record to the ALB. Leave empty to skip DNS.
+
+  DnsRecordName:
+    Type: String
+    Default: ''
+    Description: FQDN for the alias record (e.g. app.example.com). Required if DnsHostedZoneId is set.
+
+Conditions:
+  HasAcm: !Not [!Equals [!Ref ACMCertificateArn, '']]
+  CreateDns: !And
+    - !Not [!Equals [!Ref DnsHostedZoneId, '']]
+    - !Not [!Equals [!Ref DnsRecordName, '']]
+
+Resources:
+
+  # ---------------- VPC ----------------
+  MyVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-vpc'
+
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref MyVPC
+      CidrBlock: 10.0.1.0/24
+      AvailabilityZone: !Select [0, !GetAZs '']
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-public-a'
+
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref MyVPC
+      CidrBlock: 10.0.2.0/24
+      AvailabilityZone: !Select [1, !GetAZs '']
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-public-b'
+
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref MyVPC
+      CidrBlock: 10.0.3.0/24
+      AvailabilityZone: !Select [0, !GetAZs '']
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-private-a'
+
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref MyVPC
+      CidrBlock: 10.0.4.0/24
+      AvailabilityZone: !Select [1, !GetAZs '']
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-private-b'
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-igw'
+
+  AttachIGW:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref MyVPC
+      InternetGatewayId: !Ref InternetGateway
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref MyVPC
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: AttachIGW
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnet1RouteAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet1
+      RouteTableId: !Ref PublicRouteTable
+
+  PublicSubnet2RouteAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet2
+      RouteTableId: !Ref PublicRouteTable
+
+  # ---------------- Security groups ----------------
+  ALBSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Inbound for ALB (HTTP/HTTPS)
+      VpcId: !Ref MyVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-alb-sg'
+
+  EC2SG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: App instances SSH and HTTP from ALB only
+      VpcId: !Ref MyVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId: !Ref ALBSG
+      SecurityGroupEgress:
+        - IpProtocol: '-1'
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-ec2-sg'
+
+  RDSSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: MySQL from application instances
+      VpcId: !Ref MyVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          SourceSecurityGroupId: !Ref EC2SG
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-rds-sg'
+
+  # ---------------- Secrets & SSM ----------------
+  DBSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub '${AWS::StackName}-db-credentials'
+      Description: PharmaSetu MySQL master credentials for RDS
+      # Matches application.properties: medic DB, user medic_user; password = stack parameter (replace old medic_pass in prod).
+      SecretString: !Sub '{"username":"medic_user","password":"${DBPassword}","dbname":"medic"}'
+
+  # ---------------- IAM (EC2) ----------------
+  EC2Role:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforAWSCodeDeploy
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: PharmaSetuInstanceDataAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource: !Ref DBSecret
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                Resource: !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/pharmasetu/${AWS::StackName}/*'
+
+  EC2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref EC2Role
+
+  # ---------------- RDS MySQL ----------------
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: !Sub '${AWS::StackName} private subnets'
+      SubnetIds:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-db-subnets'
+
+  MyDB:
+    Type: AWS::RDS::DBInstance
+    DependsOn: DBSecret
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      Engine: mysql
+      EngineVersion: '8.0'
+      DBInstanceClass: db.t3.micro
+      AllocatedStorage: 20
+      MaxAllocatedStorage: 50
+      StorageType: gp3
+      DBName: medic
+      MasterUsername: !Sub '{{resolve:secretsmanager:${AWS::StackName}-db-credentials:SecretString:username}}'
+      MasterUserPassword: !Sub '{{resolve:secretsmanager:${AWS::StackName}-db-credentials:SecretString:password}}'
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      VPCSecurityGroups:
+        - !Ref RDSSG
+      PubliclyAccessible: false
+      BackupRetentionPeriod: 7
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-mysql'
+
+  DBHostParam:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: !Sub '/pharmasetu/${AWS::StackName}/db-host'
+      Type: String
+      Description: MySQL endpoint for UserData / application override
+      Value: !GetAtt MyDB.Endpoint.Address
+
+  # ---------------- Launch template (Amazon Linux 2 — matches scripts/yum + ec2-user) ----------------
+  LaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    DependsOn:
+      - MyDB
+      - DBHostParam
+    Properties:
+      LaunchTemplateData:
+        InstanceType: t3.micro
+        KeyName: !Ref KeyPairName
+        IamInstanceProfile:
+          Name: !Ref EC2InstanceProfile
+        ImageId: !Sub '{{resolve:ssm:/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2}}'
+        SecurityGroupIds:
+          - !Ref EC2SG
+        TagSpecifications:
+          - ResourceType: instance
+            Tags:
+              - Key: Name
+                Value: !Sub '${AWS::StackName}-app'
+              - Key: Application
+                Value: PharmaSetu
+        UserData:
+          Fn::Base64: !Sub
+            - |
+              #!/bin/bash
+              set -e
+              export AWS_DEFAULT_REGION=${AWS::Region}
+              yum update -y
+              yum install -y ruby wget nginx jq
+
+              cd /home/ec2-user
+              wget https://aws-codedeploy-ap-south-1.s3.ap-south-1.amazonaws.com/latest/install
+              chmod +x ./install
+              ./install auto
+              systemctl enable codedeploy-agent
+              systemctl start codedeploy-agent
+
+              systemctl enable nginx
+              systemctl start nginx || true
+
+              sleep 15
+              SECRET_ARN="${DbSecretArn}"
+              DB_HOST_PARAM="${DbHostParamName}"
+              DB_ENDPOINT=$(aws ssm get-parameter --name "$DB_HOST_PARAM" --query Parameter.Value --output text)
+              SECRET_JSON=$(aws secretsmanager get-secret-value --secret-id "$SECRET_ARN" --query SecretString --output text)
+              DB_USER=$(echo "$SECRET_JSON" | jq -r .username)
+              DB_PASS=$(echo "$SECRET_JSON" | jq -r .password)
+              DB_NAME=$(echo "$SECRET_JSON" | jq -r .dbname)
+              mkdir -p /etc/pharmasetu
+              {
+                echo "spring.datasource.url=jdbc:mysql://$DB_ENDPOINT:3306/$DB_NAME"
+                echo "spring.datasource.username=$DB_USER"
+                echo "spring.datasource.password=$DB_PASS"
+                echo "spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver"
+                echo "spring.jpa.database-platform=org.hibernate.dialect.MySQL8Dialect"
+                echo "spring.jpa.hibernate.ddl-auto=update"
+              } > /tmp/pharmasetu-db.properties
+              sudo mv /tmp/pharmasetu-db.properties /etc/pharmasetu/application.properties
+              sudo chmod 600 /etc/pharmasetu/application.properties
+              chown ec2-user:ec2-user /etc/pharmasetu/application.properties || true
+            - DbSecretArn: !Ref DBSecret
+              DbHostParamName: !Ref DBHostParam
+
+  # ---------------- Auto Scaling ----------------
+  AutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      VPCZoneIdentifier:
+        - !Ref PublicSubnet1
+        - !Ref PublicSubnet2
+      MinSize: 1
+      MaxSize: 2
+      DesiredCapacity: 1
+      HealthCheckType: ELB
+      HealthCheckGracePeriod: 300
+      LaunchTemplate:
+        LaunchTemplateId: !Ref LaunchTemplate
+        Version: !GetAtt LaunchTemplate.LatestVersionNumber
+      TargetGroupARNs:
+        - !Ref TargetGroup
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-asg'
+          PropagateAtLaunch: true
+
+  # ---------------- ALB ----------------
+  ALB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Subnets:
+        - !Ref PublicSubnet1
+        - !Ref PublicSubnet2
+      SecurityGroups:
+        - !Ref ALBSG
+      Scheme: internet-facing
+      Type: application
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-alb'
+
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      VpcId: !Ref MyVPC
+      Port: 80
+      Protocol: HTTP
+      TargetType: instance
+      HealthCheckEnabled: true
+      HealthCheckPath: /api/medicine/all
+      HealthCheckIntervalSeconds: 30
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 3
+      Matcher:
+        HttpCode: '200'
+
+  HTTPListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref ALB
+      Port: 80
+      Protocol: HTTP
+      DefaultActions: !If
+        - HasAcm
+        - - Type: redirect
+            RedirectConfig:
+              Protocol: HTTPS
+              Port: '443'
+              StatusCode: HTTP_301
+        - - Type: forward
+            ForwardConfig:
+              TargetGroups:
+                - TargetGroupArn: !Ref TargetGroup
+                  Weight: 1
+
+  HTTPSListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Condition: HasAcm
+    Properties:
+      LoadBalancerArn: !Ref ALB
+      Port: 443
+      Protocol: HTTPS
+      Certificates:
+        - CertificateArn: !Ref ACMCertificateArn
+      DefaultActions:
+        - Type: forward
+          ForwardConfig:
+            TargetGroups:
+              - TargetGroupArn: !Ref TargetGroup
+                Weight: 1
+
+  # ---------------- Artifacts ----------------
+  ArtifactBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  # ---------------- CI/CD IAM (same broad pattern as reference; tighten for production) ----------------
+  PipelineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - codepipeline.amazonaws.com
+                - codebuild.amazonaws.com
+                - codedeploy.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AdministratorAccess
+
+  # GitHub via CodeStar Connections (avoids legacy PAT/OAuth "Insufficient permissions" errors).
+  GitHubConnection:
+    Type: AWS::CodeStarConnections::Connection
+    Properties:
+      ConnectionName: !Sub '${AWS::StackName}-github'
+      ProviderType: GitHub
+
+  CodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      ServiceRole: !GetAtt PipelineRole.Arn
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:7.0
+        Type: LINUX_CONTAINER
+      Source:
+        Type: CODEPIPELINE
+
+  CodeDeployApp:
+    Type: AWS::CodeDeploy::Application
+    Properties:
+      ComputePlatform: Server
+
+  CodeDeployGroup:
+    Type: AWS::CodeDeploy::DeploymentGroup
+    Properties:
+      ApplicationName: !Ref CodeDeployApp
+      ServiceRoleArn: !GetAtt PipelineRole.Arn
+      DeploymentStyle:
+        DeploymentType: IN_PLACE
+        DeploymentOption: WITHOUT_TRAFFIC_CONTROL
+      AutoScalingGroups:
+        - !Ref AutoScalingGroup
+
+  Pipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      RoleArn: !GetAtt PipelineRole.Arn
+      ArtifactStore:
+        Type: S3
+        Location: !Ref ArtifactBucket
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: GitHubSource
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Provider: CodeStarSourceConnection
+                Version: '1'
+              OutputArtifacts:
+                - Name: SourceOutput
+              Configuration:
+                ConnectionArn: !Ref GitHubConnection
+                FullRepositoryId: !Sub '${GitHubOwner}/${GitHubRepo}'
+                BranchName: !Ref GitHubBranch
+                OutputArtifactFormat: CODE_ZIP
+        - Name: Build
+          Actions:
+            - Name: BuildStep
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              InputArtifacts:
+                - Name: SourceOutput
+              OutputArtifacts:
+                - Name: BuildOutput
+              Configuration:
+                ProjectName: !Ref CodeBuildProject
+        - Name: Deploy
+          Actions:
+            - Name: DeployStep
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: CodeDeploy
+                Version: '1'
+              InputArtifacts:
+                - Name: BuildOutput
+              Configuration:
+                ApplicationName: !Ref CodeDeployApp
+                DeploymentGroupName: !Ref CodeDeployGroup
+
+  DnsRecord:
+    Type: AWS::Route53::RecordSet
+    Condition: CreateDns
+    Properties:
+      HostedZoneId: !Ref DnsHostedZoneId
+      Name: !Ref DnsRecordName
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt ALB.DNSName
+        HostedZoneId: !GetAtt ALB.CanonicalHostedZoneID
+
+Outputs:
+  LoadBalancerDNS:
+    Description: ALB DNS — point your frontend API base URL here (HTTPS if ACM configured).
+    Value: !GetAtt ALB.DNSName
+  RDSEndpoint:
+    Description: MySQL endpoint (private).
+    Value: !GetAtt MyDB.Endpoint.Address
+  ArtifactBucketName:
+    Value: !Ref ArtifactBucket
+  CodePipelineName:
+    Value: !Ref Pipeline
+  CodeDeployApplication:
+    Value: !Ref CodeDeployApp
+  DbSecretArn:
+    Description: Secrets Manager ARN for DB credentials (username medic_user, database medic).
+    Value: !Ref DBSecret
+  GitHubConnectionArn:
+    Description: CodeStar Connections ARN — authorize GitHub once in the console (see next output).
+    Value: !Ref GitHubConnection
+  GitHubConnectionSetup:
+    Description: >
+      After stack create/update, open Developer Tools > Connections (or CodePipeline settings),
+      find the connection for this stack, click Update pending connection, and approve GitHub
+      access for your repository. Until status is Available, the pipeline source action will fail.
+    Value: !Sub 'Authorize ${GitHubConnection} in this account/region before running the pipeline.'
