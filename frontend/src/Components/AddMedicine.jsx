@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import axios from "axios";
+import api from "../Service/api";
 import "./AddMedicine.css";
 
 const AddMedicine = () => {
@@ -23,7 +23,7 @@ const AddMedicine = () => {
     if (!medicine.name) return;
     setLoading(true);
     try {
-      const response = await axios.get(`http://localhost:8083/medicine/fetch/${medicine.name}`);
+      const response = await api.get(`/medicine/fetch/${encodeURIComponent(medicine.name)}`);
       setFdaData(response.data);
       setMedicine({
         ...medicine,
@@ -40,8 +40,8 @@ const AddMedicine = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await axios.post("http://localhost:8083/medicine/add", medicine, {
-        headers: { Authorization: `Bearer ${token}` }
+      await api.post("/medicine/add", medicine, {
+        headers: { Authorization: `Bearer ${token}` },
       });
       alert("Medicine added successfully!");
       setMedicine({

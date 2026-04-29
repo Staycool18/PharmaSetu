@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import api from "../Service/api";
 import MockPaymentGateway from "./MockPaymentGateway";
 import "./Checkout.css";
 
@@ -40,28 +41,20 @@ const Checkout = () => {
         return;
       }
 
-      const orderResponse = await fetch("http://localhost:8083/orders/create", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          items: orderData.items.map(item => ({
+      const orderResponse = await api.post(
+        "/orders/create",
+        {
+          items: orderData.items.map((item) => ({
             medicineId: item.id,
             quantity: item.quantity,
-            price: item.price
+            price: item.price,
           })),
-          totalAmount: orderData.total
-        })
-      });
+          totalAmount: orderData.total,
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
 
-      if (!orderResponse.ok) {
-        const errorText = await orderResponse.text();
-        throw new Error(`Failed to create order: ${errorText}`);
-      }
-
-      const order = await orderResponse.json();
+      const order = orderResponse.data;
       setOrderData({...orderData, orderId: order.id});
       setShowPaymentGateway(true);
     } catch (error) {
@@ -74,21 +67,18 @@ const Checkout = () => {
   const handlePaymentSuccess = async (paymentResponse) => {
     try {
       const token = localStorage.getItem("token");
-      const verifyResponse = await fetch("http://localhost:8083/orders/verify-payment", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify({
+      const verifyResponse = await api.post(
+        "/orders/verify-payment",
+        {
           paymentId: paymentResponse.razorpay_payment_id,
           orderId: paymentResponse.razorpay_order_id,
           signature: paymentResponse.razorpay_signature,
-          orderEntityId: orderData.orderId
-        })
-      });
+          orderEntityId: orderData.orderId,
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
 
-      if (verifyResponse.ok) {
+      if (verifyResponse.status >= 200 && verifyResponse.status < 300) {
         localStorage.removeItem("cart");
         navigate("/pharmacies", { 
           state: { 
@@ -205,28 +195,22 @@ export const handleDirectBuyNow = async (medicine, navigate) => {
       return;
     }
 
-    const orderResponse = await fetch("http://localhost:8083/orders/create", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`
+    const orderResponse = await api.post(
+      "/orders/create",
+      {
+        items: [
+          {
+            medicineId: medicine.id,
+            quantity: 1,
+            price: medicine.price,
+          },
+        ],
+        totalAmount: medicine.price,
       },
-      body: JSON.stringify({
-        items: [{
-          medicineId: medicine.id,
-          quantity: 1,
-          price: medicine.price
-        }],
-        totalAmount: medicine.price
-      })
-    });
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
 
-    if (!orderResponse.ok) {
-      const errorText = await orderResponse.text();
-      throw new Error(`Failed to create order: ${errorText}`);
-    }
-
-    const order = await orderResponse.json();
+    const order = orderResponse.data;
 
     // Navigate to checkout with single item
     navigate("/checkout", { 

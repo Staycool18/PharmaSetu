@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "../Service/api";
 import Cart from "./Cart";
 import QuantityModal from "./QuantityModal";
 import { handleDirectBuyNow } from "./Checkout";
@@ -40,8 +40,8 @@ const PharmacyDashboard = () => {
 
   const fetchPharmacy = async () => {
     try {
-      const response = await axios.get(`http://localhost:8083/pharmacy/${pharmacyId}`, {
-        headers: { Authorization: `Bearer ${token}` }
+      const response = await api.get(`/pharmacy/${pharmacyId}`, {
+        headers: { Authorization: `Bearer ${token}` },
       });
       setPharmacy(response.data);
     } catch (err) {
@@ -51,8 +51,8 @@ const PharmacyDashboard = () => {
 
   const fetchMedicines = async () => {
     try {
-      const response = await axios.get(`http://localhost:8083/medicine/pharmacy/${pharmacyId}`, {
-        headers: { Authorization: `Bearer ${token}` }
+      const response = await api.get(`/medicine/pharmacy/${pharmacyId}`, {
+        headers: { Authorization: `Bearer ${token}` },
       });
       setMedicines(response.data);
     } catch (err) {
@@ -68,7 +68,7 @@ const PharmacyDashboard = () => {
     if (!medicine.name) return;
     setFdaLoading(true);
     try {
-      const response = await axios.get(`http://localhost:8083/medicine/fetch/${medicine.name}`);
+      const response = await api.get(`/medicine/fetch/${encodeURIComponent(medicine.name)}`);
       if (response.data) {
         setMedicine({
           ...medicine,
@@ -95,8 +95,8 @@ const PharmacyDashboard = () => {
     }
     
     try {
-      await axios.post("http://localhost:8083/medicine/add", medicine, {
-        headers: { Authorization: `Bearer ${token}` }
+      await api.post("/medicine/add", medicine, {
+        headers: { Authorization: `Bearer ${token}` },
       });
       alert("Medicine added successfully!");
       setMedicine({ name: "", description: "", usage: "", warnings: "", sideEffects: "" });

@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "../Service/api";
 
 const SignupPharmacy = () => {
   const navigate = useNavigate();
@@ -21,8 +21,8 @@ const SignupPharmacy = () => {
   const handleRegister = async (e) => {
     e.preventDefault();
     try {
-      await axios.post(
-        `http://localhost:8083/auth/register-pharmacy-details?username=${username}`,
+      await api.post(
+        `/auth/register-pharmacy-details?username=${encodeURIComponent(username)}`,
         data,
         { headers: { Authorization: `Bearer ${token}` } }
       );

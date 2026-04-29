@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "../Service/api";
 import "./OrderHistory.css";
 
 const OrderHistory = () => {
@@ -15,8 +15,8 @@ const OrderHistory = () => {
 
   const fetchOrders = async () => {
     try {
-      const response = await axios.get("http://localhost:8083/orders/my-orders", {
-        headers: { Authorization: `Bearer ${token}` }
+      const response = await api.get("/orders/my-orders", {
+        headers: { Authorization: `Bearer ${token}` },
       });
       setOrders(response.data);
     } catch (err) {

@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "../Service/api";
 import "../Authenticate/SignupUser.css";
 
 const RegisterPharmacy = () => {
@@ -22,8 +22,8 @@ const RegisterPharmacy = () => {
   const handleRegister = async (e) => {
   e.preventDefault();
   try {
-    await axios.post(
-      "http://localhost:8083/pharmacy/create", // correct route
+    await api.post(
+      "/pharmacy/create",
       {
         pharmacyName: data.pharmacyName,
         email: data.email,

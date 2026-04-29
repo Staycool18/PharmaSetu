@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "../Service/api";
 import Card from "./Card";
 import "./PharmacyList.css";
 
@@ -26,19 +26,16 @@ const PharmacyList = () => {
           const lon = position.coords.longitude;
 
           // 2️⃣ Call Spring Boot backend with location
-          const response = await axios.get(
-            "http://localhost:8080/api/pharmacies/nearby",
-            {
-              params: {
-                lat,
-                lon,
-                radius: 5
-              },
-              headers: {
-                Authorization: `Bearer ${token}`
-              }
-            }
-          );
+          const response = await api.get("/pharmacy/nearby", {
+            params: {
+              lat,
+              lon,
+              radius: 5,
+            },
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
 
           setPharmacies(response.data);
         } catch (error) {

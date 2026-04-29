@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import axios from "axios";
+import api from "../Service/api";
 import "./ForgetPassword.css";
 
 const ForgetPassword = ({ onBack }) => {
@@ -32,7 +32,7 @@ const ForgetPassword = ({ onBack }) => {
     
     setLoading(true);
     try {
-      await axios.post("http://localhost:8083/auth/forgot-password", { email });
+      await api.post("/auth/forgot-password", { email });
       setMessage("Password reset email sent! Check your inbox.");
       setMessageType("success");
     } catch (err) {

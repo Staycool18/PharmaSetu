@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import api from "../Service/api";
 import "./QuantityModal.css";
 
 // Function for Buy Now with quantity
@@ -12,28 +13,22 @@ const handleDirectBuyNowWithQuantity = async (medicine, quantity, navigate) => {
       return;
     }
 
-    const orderResponse = await fetch("http://localhost:8083/orders/create", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}`
+    const orderResponse = await api.post(
+      "/orders/create",
+      {
+        items: [
+          {
+            medicineId: medicine.id,
+            quantity: quantity,
+            price: medicine.price,
+          },
+        ],
+        totalAmount: medicine.price * quantity,
       },
-      body: JSON.stringify({
-        items: [{
-          medicineId: medicine.id,
-          quantity: quantity,
-          price: medicine.price
-        }],
-        totalAmount: medicine.price * quantity
-      })
-    });
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
 
-    if (!orderResponse.ok) {
-      const errorText = await orderResponse.text();
-      throw new Error(`Failed to create order: ${errorText}`);
-    }
-
-    const order = await orderResponse.json();
+    const order = orderResponse.data;
 
     navigate("/checkout", { 
       state: { 

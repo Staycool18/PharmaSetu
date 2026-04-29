@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import axios from "axios";
+import api from "../Service/api";
 import "./ForgetPassword.css";
 
 const ResetPassword = () => {
@@ -36,7 +36,7 @@ const ResetPassword = () => {
 
     setLoading(true);
     try {
-      await axios.post("http://localhost:8083/auth/reset-password", {
+      await api.post("/auth/reset-password", {
         token,
         newPassword: password
       });

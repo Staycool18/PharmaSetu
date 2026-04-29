@@ -3,6 +3,7 @@ package com.Medic.Medic.Service.Implementation;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
@@ -17,10 +18,12 @@ public class EmailService {
 	
 	private final String fromEmail = "vedantsalvi2353@gmail.com";
 	private final String fromName = "PharmaSetu Team";
-	private final String baseUrl = "http://localhost:5173";
+
+	@Value("${app.frontend.url:https://deploysolutions.me}")
+	private String frontendBaseUrl;
 	
 	public void sendVerificationEmail(String toEmail, String token) {
-        String verificationUrl = baseUrl + "/auth/verify-email?token=" + token;
+        String verificationUrl = frontendBaseUrl.replaceAll("/+$", "") + "/auth/verify-email?token=" + token;
         String subject = "PharmaSetu - Email Verification";
         String body = "Dear User,\n\n" +
                 "Thank you for registering with PharmaSetu Online Pharmacy App.\n\n" +
@@ -38,7 +41,7 @@ public class EmailService {
      * Send password reset email
      */
     public void sendPasswordResetEmail(String toEmail, String token) {
-        String resetUrl = "http://localhost:5173/reset-password?token=" + token;
+        String resetUrl = frontendBaseUrl.replaceAll("/+$", "") + "/reset-password?token=" + token;
         String subject = "PharmaSetu - Password Reset Request";
         String body = "Dear User,\n\n" +
                 "We received a request to reset your password.\n\n" +

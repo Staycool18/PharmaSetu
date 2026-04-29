@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import api from "../Service/api";
 import "./PharmacyDashboard.css";
 
 const SimplePharmacyDashboard = () => {
@@ -29,7 +29,7 @@ const SimplePharmacyDashboard = () => {
   const fetchMedicines = async () => {
     try {
       // For now, get all medicines since we don't have pharmacy-specific endpoint working
-      const response = await axios.get("http://localhost:8083/medicine/all");
+      const response = await api.get("/medicine/all");
       setMedicines(response.data || []);
     } catch (err) {
       console.error("Error fetching medicines:", err);
@@ -45,7 +45,7 @@ const SimplePharmacyDashboard = () => {
     if (!medicine.name) return;
     setFdaLoading(true);
     try {
-      const response = await axios.get(`http://localhost:8083/medicine/fetch/${medicine.name}`);
+      const response = await api.get(`/medicine/fetch/${encodeURIComponent(medicine.name)}`);
       if (response.data) {
         setMedicine({
           ...medicine,
@@ -67,8 +67,8 @@ const SimplePharmacyDashboard = () => {
     }
     
     try {
-      await axios.delete(`http://localhost:8083/medicine/delete/${medicineId}`, {
-        headers: { Authorization: `Bearer ${token}` }
+      await api.delete(`/medicine/delete/${medicineId}`, {
+        headers: { Authorization: `Bearer ${token}` },
       });
       alert("Medicine deleted successfully!");
       fetchMedicines();
@@ -126,11 +126,11 @@ const SimplePharmacyDashboard = () => {
     }
     
     try {
-      const response = await axios.post("http://localhost:8083/medicine/add", medicine, {
-        headers: { 
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+      const response = await api.post("/medicine/add", medicine, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
       });
       setSuccess("Medicine added successfully!");
       setMedicine({ name: "", description: "", usage: "", warnings: "", sideEffects: "", price: "", quantity: "" });
