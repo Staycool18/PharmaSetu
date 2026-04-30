@@ -56,10 +56,13 @@ fi
 
 echo "Found JAR: $JAR_FILE"
 
-# Configure nginx
+# Configure nginx (remove stock default — it uses default_server and keeps serving
+# "Welcome to nginx" even when this file exists, because alphabetically default.conf wins.)
+sudo rm -f /etc/nginx/conf.d/default.conf
+
 cat << 'EOF' | sudo tee /etc/nginx/conf.d/pharmasetu.conf
 server {
-    listen 80;
+    listen 80 default_server;
     server_name _;
 
     root /var/www/pharmasetu;
