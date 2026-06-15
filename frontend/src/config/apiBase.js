@@ -14,9 +14,11 @@ export function resolveApiBase() {
     }
     return `${raw}/api`;
   }
-  if (import.meta.env.DEV) {
+  if (typeof window !== "undefined") {
     const host = typeof window !== "undefined" ? window.location.hostname : "localhost";
+    // For EC2/IP deployments without reverse proxy, frontend is commonly on :80/:5173 and backend on :8083.
+    // Using direct backend origin avoids hardcoded domains.
     return `http://${host}:8083`;
   }
-  return "https://deploysolutions.me/api";
+  return "http://localhost:8083";
 }
