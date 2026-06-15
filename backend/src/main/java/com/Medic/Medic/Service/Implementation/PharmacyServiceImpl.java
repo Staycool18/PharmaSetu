@@ -25,7 +25,7 @@ public class PharmacyServiceImpl implements PharmacyService {
 
     @Autowired
     private BCryptPasswordEncoder passwordEncoder;
-  
+
     @Override
     public Pharmacy getPharmacyByUser(User user) {
         return pharmacyRepository.findByUser(user).orElse(null);
@@ -51,18 +51,37 @@ public class PharmacyServiceImpl implements PharmacyService {
 
     @Override
     public Pharmacy createPharmacy(Pharmacy pharmacy) {
+        if (pharmacy.getEmail() == null || pharmacy.getEmail().isBlank()) {
+            throw new IllegalArgumentException("Pharmacy email is required");
+        }
+        if (pharmacy.getPassword() == null || pharmacy.getPassword().isBlank()) {
+            throw new IllegalArgumentException("Pharmacy password is required");
+        }
+
         // Check if user already exists
         User existingUser = userRepository.findByUsername(pharmacy.getEmail()).orElse(null);
-        
+
         User user;
         if (existingUser != null) {
             user = existingUser;
+            if (user.getRole() == null || !"ROLE_PHARMACY".equals(user.getRole())) {
+                user.setRole("ROLE_PHARMACY");
+                userRepository.save(user);
+            }
         } else {
             user = new User();
-            user.setEmailId(pharmacy.getEmail());           
+            user.setEmailId(pharmacy.getEmail());
             user.setUsername(pharmacy.getEmail());
             user.setPassword(passwordEncoder.encode(pharmacy.getPassword()));
             user.setRole("ROLE_PHARMACY");
+            // Users table has non-null constraints; provide defaults for pharmacy accounts.
+            user.setFullName(pharmacy.getPharmacyName() == null || pharmacy.getPharmacyName().isBlank()
+                    ? "Pharmacy Owner"
+                    : pharmacy.getPharmacyName());
+            user.setDateOfBirth("1970-01-01");
+            user.setPhoneNumber("9999999999");
+            user.setGender("OTHER");
+            user.setAddress(pharmacy.getAddress() == null ? "Not Provided" : pharmacy.getAddress());
             user = userRepository.save(user);
         }
 
@@ -72,19 +91,18 @@ public class PharmacyServiceImpl implements PharmacyService {
         // Save Pharmacy
         return pharmacyRepository.save(pharmacy);
     }
-    
-	@Override
-	public List<Pharmacy> getAllPharmacy() {
-		return pharmacyRepository.findAll();
-		
-	}
 
     @Override
-     public List<PharmacyLocationResponse> getNearbyPharmacies(
+    public List<Pharmacy> getAllPharmacy() {
+        return pharmacyRepository.findAll();
+
+    }
+
+    @Override
+    public List<PharmacyLocationResponse> getNearbyPharmacies(
             double lat, double lon, double radius) {
 
-        List<Object[]> results =
-                pharmacyRepository.findNearbyPharmacies(lat, lon, radius);
+        List<Object[]> results = pharmacyRepository.findNearbyPharmacies(lat, lon, radius);
 
         List<PharmacyLocationResponse> response = new ArrayList<>();
 
@@ -95,11 +113,9 @@ public class PharmacyServiceImpl implements PharmacyService {
             response.add(new PharmacyLocationResponse(
                     pharmacy.getPharmacyName(),
                     pharmacy.getAddress(),
-                    distance
-            ));
+                    distance));
         }
         return response;
     }
-    
-     
+
 }

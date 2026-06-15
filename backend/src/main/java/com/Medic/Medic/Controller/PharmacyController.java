@@ -20,7 +20,6 @@ import com.Medic.Medic.Service.PharmacyService;
 
 import jakarta.servlet.http.HttpServletRequest;
 
-
 @RestController
 @RequestMapping("/pharmacy")
 public class PharmacyController {
@@ -30,16 +29,21 @@ public class PharmacyController {
 
     @PostMapping("/create")
     public ResponseEntity<?> create(@RequestBody Pharmacy pharmacy) {
-        Pharmacy saved = pharmacyService.createPharmacy(pharmacy);
-        return ResponseEntity.ok(saved);
+        try {
+            Pharmacy saved = pharmacyService.createPharmacy(pharmacy);
+            return ResponseEntity.ok(saved);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Failed to register pharmacy");
+        }
     }
 
     @GetMapping("/nearby")
     public List<PharmacyLocationResponse> getNearbyPharmacies(
             @RequestParam double lat,
             @RequestParam double lon,
-            @RequestParam(defaultValue = "5") double radius
-    ) {
+            @RequestParam(defaultValue = "5") double radius) {
         return pharmacyService.getNearbyPharmacies(lat, lon, radius);
     }
 
@@ -56,9 +60,9 @@ public class PharmacyController {
         Pharmacy pharmacy = pharmacyService.getPharmacyById(id);
         return ResponseEntity.ok(pharmacy);
     }
-    
+
     @GetMapping("/")
-    public ResponseEntity<?> getAll(HttpServletRequest request){
+    public ResponseEntity<?> getAll(HttpServletRequest request) {
         String authHeader = request.getHeader("Authorization");
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             // User is authenticated - check role
@@ -67,17 +71,17 @@ public class PharmacyController {
         List<Pharmacy> ph = pharmacyService.getAllPharmacy();
         return ResponseEntity.ok(ph);
     }
-    
+
     @GetMapping("/my-pharmacy")
     public ResponseEntity<?> getMyPharmacy(@RequestHeader("Authorization") String authHeader) {
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             return ResponseEntity.status(401).body("Authorization required");
         }
-        
+
         String token = authHeader.substring(7);
-        org.springframework.security.core.Authentication auth = 
-            org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
-        
+        org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder
+                .getContext().getAuthentication();
+
         if (auth != null && auth.isAuthenticated()) {
             String username = auth.getName();
             Pharmacy pharmacy = pharmacyService.getPharmacyByUsername(username);
@@ -86,9 +90,8 @@ public class PharmacyController {
             }
             return ResponseEntity.ok(pharmacy);
         }
-        
+
         return ResponseEntity.status(401).body("Not authenticated");
     }
 
 }
-

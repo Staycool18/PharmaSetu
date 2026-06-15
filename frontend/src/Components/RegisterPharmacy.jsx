@@ -12,9 +12,6 @@ const RegisterPharmacy = () => {
     password: ""
   });
 
-  const token = localStorage.getItem("token");
-  const username = localStorage.getItem("username");
-
   const handleChange = (e) => {
     setData({ ...data, [e.target.name]: e.target.value });
   };
@@ -29,9 +26,6 @@ const RegisterPharmacy = () => {
         email: data.email,
         licenseNumber: Number(data.licenseNumber),
         password: data.password
-      },
-      {
-        headers: { Authorization: `Bearer ${token}` } 
       }
     );
     alert("Pharmacy registered successfully!");

@@ -15,21 +15,20 @@ public interface PharmacyRepository extends JpaRepository<Pharmacy, Long> {
     Optional<Pharmacy> findByUser(User user);
 
     @Query(value = """
-        SELECT p.*,
-        (6371 * acos(
-            cos(radians(:lat)) *
-            cos(radians(p.latitude)) *
-            cos(radians(p.longitude) - radians(:lon)) +
-            sin(radians(:lat)) *
-            sin(radians(p.latitude))
-        )) AS distance
-        FROM pharmacy p
-        HAVING distance <= :radius
-        ORDER BY distance
-        """, nativeQuery = true)
+            SELECT p.*,
+            (6371 * acos(
+                cos(radians(:lat)) *
+                cos(radians(p.latitude)) *
+                cos(radians(p.longitude) - radians(:lon)) +
+                sin(radians(:lat)) *
+                sin(radians(p.latitude))
+            )) AS distance
+            FROM pharmacies p
+            HAVING distance <= :radius
+            ORDER BY distance
+            """, nativeQuery = true)
     List<Object[]> findNearbyPharmacies(
             @Param("lat") double lat,
             @Param("lon") double lon,
-            @Param("radius") double radius
-    );
+            @Param("radius") double radius);
 }

@@ -72,6 +72,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 "/auth/**",
+                                "/pharmacy/create",
                                 "/medicine/all",
                                 "/medicine/fetch/**",
                                 "/orders/**")
